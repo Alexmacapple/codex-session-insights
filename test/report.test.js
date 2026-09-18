@@ -24,14 +24,17 @@ function makeSummary(overrides = {}) {
     reasoningItems: 1,
     toolCounts: { apply_patch: 2, exec_command: 1 },
     commandKindCounts: { git_commit: 1 },
-    toolFailures: { git_push: 1 },
+    toolFailures: { 'git push': 1 },
     totalToolCalls: 3,
     totalCommandFailures: 1,
     commandFailures: [],
     commandSamples: [],
     averageCommandDurationMs: 1200,
-    medianResponseTimeSeconds: 8,
-    averageResponseTimeSeconds: 10,
+    activeMinutes: 20,
+    benignCommandMisses: 3,
+    turnDurationsSeconds: [30, 90, 120],
+    medianTurnSeconds: 90,
+    medianUserReplyGapSeconds: 45,
     activeHours: [10, 11],
     userMessageTimestamps: ['2026-04-02T10:00:00.000Z'],
     transcriptForAnalysis: '[User] Fix parser',
@@ -39,7 +42,7 @@ function makeSummary(overrides = {}) {
     gitPushes: 0,
     userInterruptions: 1,
     toolErrors: 1,
-    toolErrorCategories: { git_push: 1 },
+    toolErrorCategories: { git_error: 1 },
     usesTaskAgent: true,
     usesMcp: false,
     usesWebSearch: true,
@@ -115,13 +118,21 @@ test('buildReport aggregates summary metrics and terminal output', () => {
   }
 
   assert.equal(report.metadata.threadCount, 2)
+  assert.deepEqual(report.metadata.facetCoverage, { labeledThreads: 0, totalThreads: 2, share: 0 })
   assert.equal(report.summary.totalUserMessages, 8)
+  assert.equal(report.summary.totalActiveHours, 0.7)
+  assert.equal(report.summary.totalDurationHours, 1)
+  assert.equal(report.summary.totalBenignMisses, 6)
+  assert.equal(report.summary.turnCount, 6)
+  assert.equal(report.summary.medianTurnSeconds, 90)
+  assert.equal(report.summary.p90TurnSeconds, 120)
   assert.equal(report.summary.totalTokens, 267)
   assert.equal(report.summary.sessionsUsingTaskAgent, 2)
   assert.equal(report.charts.projects[0].value, 1)
 
   const terminal = renderTerminalSummary(report)
   assert.match(terminal, /Codex Insights/)
+  assert.match(terminal, /0\.7h active/)
   assert.match(terminal, /Analysis cost: 1.3K tokens across 5 model calls/)
   assert.match(terminal, /Estimate vs Actual: 1.2K tokens -> 0.9K tokens \(fresh\)/)
   assert.match(terminal, /Top Projects:/)
@@ -178,9 +189,28 @@ test('writeReportFiles writes JSON and HTML outputs', async () => {
           },
         ],
       },
+      open_loops: {
+        intro: 'One thread ended without confirmed completion.',
+        items: [
+          {
+            title: 'envmap acceptance',
+            project: '/repo/project-a',
+            thread_title: 'Fix parser',
+            what_is_left: 'Visual acceptance was never confirmed.',
+            evidence: 'unfinished_work: visual acceptance not confirmed',
+          },
+        ],
+      },
       fun_ending: { headline: 'A good save', detail: 'Recovered a broken patch.' },
     },
-    facets: [],
+    facets: [
+      {
+        threadId: 'thread-1',
+        outcome: 'partially_achieved',
+        session_type: 'single_task',
+        unfinished_work: 'visual acceptance not confirmed',
+      },
+    ],
   })
   report.analysisUsage = {
     calls: 3,
@@ -202,6 +232,13 @@ test('writeReportFiles writes JSON and HTML outputs', async () => {
 
   assert.match(html, /At a Glance/)
   assert.match(html, /Strong editing loops\./)
+  assert.match(html, /Median Turn/)
+  assert.match(html, /1m 30s/)
+  assert.match(html, /Based only on 1 of 1 labeled threads|Based on LLM labels for all 1 threads/)
+  assert.match(html, /Git operation failed/)
+  assert.match(html, /Open Loops/)
+  assert.match(html, /envmap acceptance/)
+  assert.doesNotMatch(html, /Avg Response/)
   assert.match(html, /Copy All Checked/)
   assert.match(html, /Paste into Codex:/)
   assert.match(html, /Estimate vs Actual/)

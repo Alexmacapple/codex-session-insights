@@ -48,9 +48,19 @@ The HTML report includes these sections:
 - `How You Use Codex`
 - `Impressive Things You Did`
 - `Where Things Go Wrong`
+- `Open Loops` (sessions that ended without confirmed completion)
 - `Features to Try`
 - `On the Horizon`
 - `One More Thing`
+
+### How the headline numbers are defined
+
+- `Active Time` sums the gaps between consecutive rollout events, skipping any gap longer than 30 minutes. The raw first-to-last span of each thread is shown separately as `Thread span (wall clock)` in the appendix.
+- `Median Turn` is the time from a user message to the assistant's final answer for that turn. It includes tool, build, and sub-agent run time, so it describes how long turns take, not how responsive the model is.
+- `Tool Errors` counts non-zero command exits plus failed tool calls. Probe misses such as `rg`, `grep`, or `test` exiting 1 with nothing found are excluded and reported separately.
+- `Failure Hotspots (by command)` groups failures by the program that actually ran (`git push`, `cmake`, `npm test`), not by the Codex `parsed_cmd` type, which labels most compound commands `unknown`.
+- `Failure Causes` is a heuristic classification from exit code and output text (`test_failed`, `build_failed`, `git_error`, `command_not_found`, `interrupted`, and so on). `unclassified` means the cause could not be determined.
+- `Session Types` and `Outcomes` only cover threads that received an LLM label. Each panel states its coverage (for example "12 of 124 labeled threads"), and the narrative sections are instructed not to extrapolate beyond it. Re-running the tool extends coverage because labels are cached.
 
 ## Typical Usage
 
@@ -157,15 +167,18 @@ The tool reads local Codex data from your machine.
 
 - With `provider=codex-cli`, analysis is performed through your local Codex CLI session
 - With `provider=openai`, prompts are sent through the OpenAI Responses API
+- To avoid suggesting rules you already have, the tool reads `AGENTS.md` from `~/.codex` and from your most active project directories (up to 6,000 characters each) and includes those excerpts in the suggestion prompts. Pass `--no-repo-instructions` to skip this
 - Generated reports may contain project paths, thread titles, summaries, and other local development context
 
 Review `report.html` and `report.json` before sharing them.
 
 ## Limitations
 
-- Rollout event schemas may drift across Codex versions. Version 0.3.0 reads both the legacy `user_message` / `exec_command_end` events and the `item_completed` events written by Codex CLI 0.15x+
+- Rollout event schemas may drift across Codex versions. Version 0.3.0 and later read both the legacy `user_message` / `exec_command_end` events and the `item_completed` events written by Codex CLI 0.15x+
 - Model names are those exposed to ChatGPT-backed Codex accounts as of September 2026; if a default model is retired, the tool falls back to the closest available model automatically
 - Token estimates are conservative, not billing-accurate
+- Failure causes are classified by pattern matching on exit codes and command output; unusual toolchains may land in `unclassified`
+- Turn timing and active time are derived from rollout event timestamps, so they cannot separate time spent waiting on a sub-agent from time spent by the main agent
 - The tool is designed around Codex local storage layout and is not a generic agent log analyzer
 - Windows support is not yet verified
 
@@ -218,7 +231,7 @@ Publishing is automated by `.github/workflows/release.yml` and uses npm Trusted 
 2. Tag the commit with the same version and push the tag:
 
 ```bash
-git tag v0.3.0
+git tag v0.4.0
 git push origin main --tags
 ```
 
