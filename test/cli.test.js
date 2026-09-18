@@ -65,11 +65,17 @@ test('parseArgs keeps explicit scope flags over preset defaults', () => {
   assert.equal(parsed.options.facetLimit, 9)
 })
 
+test('parseArgs recognizes the version flag', () => {
+  assert.equal(cliTest.parseArgs(['--version']).version, true)
+  assert.equal(cliTest.parseArgs(['-v']).version, true)
+  assert.equal(cliTest.parseArgs(['report']).version, false)
+})
+
 test('applyQualityPreset maps balanced preset to default model plan', () => {
   assert.deepEqual(cliTest.applyQualityPreset({}, 'balanced'), {
-    facetModel: 'gpt-5.4-mini',
-    fastSectionModel: 'gpt-5.4-mini',
-    insightModel: 'gpt-5.4',
+    facetModel: 'gpt-5.6-luna',
+    fastSectionModel: 'gpt-5.6-luna',
+    insightModel: 'gpt-6-astra',
     facetEffort: 'low',
     fastSectionEffort: 'low',
     insightEffort: 'high',
@@ -85,9 +91,9 @@ test('buildEquivalentCommand emits a replayable command', () => {
     openReport: false,
     outDir: '/tmp/out dir',
     provider: 'codex-cli',
-    facetModel: 'gpt-5.4-mini',
-    fastSectionModel: 'gpt-5.4-mini',
-    insightModel: 'gpt-5.4',
+    facetModel: 'gpt-5.6-luna',
+    fastSectionModel: 'gpt-5.6-luna',
+    insightModel: 'gpt-6-astra',
     facetEffort: 'low',
     fastSectionEffort: 'low',
     insightEffort: 'high',

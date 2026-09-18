@@ -102,13 +102,13 @@ Optional:
 Choose model preset:
 
 - Balanced
-  - facet: `gpt-5.3-codex-spark`
-  - fast sections: `gpt-5.3-codex-spark`
-  - final sections: `gpt-5.4`
+  - facet: `gpt-5.6-luna`
+  - fast sections: `gpt-5.6-luna`
+  - final sections: `gpt-6-astra`
 - Cheaper
-  - push more section work to `gpt-5.3-codex-spark`
+  - run every stage on `gpt-5.6-luna`
 - Higher Quality
-  - use `gpt-5.4` more aggressively
+  - run every stage on `gpt-6-astra`
 
 Choose reasoning preset:
 

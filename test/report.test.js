@@ -12,7 +12,7 @@ function makeSummary(overrides = {}) {
     title: 'Fix parser',
     firstUserMessage: 'Fix parser issue',
     cwd: '/repo/project-a',
-    model: 'gpt-5.4',
+    model: 'gpt-6-astra',
     modelProvider: 'openai',
     createdAt: '2026-04-01T10:00:00.000Z',
     updatedAt: '2026-04-02T10:00:00.000Z',
@@ -65,7 +65,7 @@ test('buildReport aggregates summary metrics and terminal output', () => {
       makeSummary({
         id: 'thread-2',
         cwd: '/repo/project-b',
-        model: 'gpt-5.3-codex-spark',
+        model: 'gpt-5.6-luna',
         createdAt: '2026-04-03T10:00:00.000Z',
         updatedAt: '2026-04-04T10:00:00.000Z',
         totalCommandFailures: 0,

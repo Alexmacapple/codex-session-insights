@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.10.0
+
+      - name: Read version
+        id: version
+        run: echo "value=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Verify tag matches package.json
+        if: github.event_name == 'push'
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VERSION="${{ steps.version.outputs.value }}"
+          echo "tag: ${TAG}"
+          echo "package.json: ${VERSION}"
+          if [ "${TAG}" != "${VERSION}" ]; then
+            echo "::error::Tag v${TAG} does not match package.json version ${VERSION}."
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+
+      - name: Publish to npm
+        run: npm publish --access public
+
+      - name: Smoke test (npm install + version check)
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          # Wait for the registry to propagate the new version.
+          sleep 10
+          npm install -g "codex-session-insights@${VERSION}"
+          ACTUAL=$(codex-session-insights --version 2>&1) || true
+          echo "Installed version: ${ACTUAL}"
+          if [ "${ACTUAL}" != "${VERSION}" ]; then
+            echo "::error::Smoke test failed: expected ${VERSION}, got ${ACTUAL}"
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.value }}
+          generate_release_notes: true

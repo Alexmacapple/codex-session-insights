@@ -117,9 +117,9 @@ Current default analysis plan:
 - `limit`: `200`
 - `facet-limit`: `50`
 - `provider`: `codex-cli`
-- `facet-model`: `gpt-5.4-mini`
-- `fast-section-model`: `gpt-5.4-mini`
-- `insight-model`: `gpt-5.4`
+- `facet-model`: `gpt-5.6-luna`
+- `fast-section-model`: `gpt-5.6-luna`
+- `insight-model`: `gpt-6-astra`
 - `facet-effort`: `low`
 - `fast-section-effort`: `low`
 - `insight-effort`: `high`
@@ -141,7 +141,7 @@ Important behavior defaults:
 
 ## Requirements
 
-- Node.js `>=18`
+- Node.js `>=20.17`
 - `sqlite3` available on your system `PATH`
 - Codex CLI installed if you use the default `codex-cli` provider
 
@@ -163,7 +163,8 @@ Review `report.html` and `report.json` before sharing them.
 
 ## Limitations
 
-- Rollout event schemas may drift across Codex versions
+- Rollout event schemas may drift across Codex versions. Version 0.3.0 reads both the legacy `user_message` / `exec_command_end` events and the `item_completed` events written by Codex CLI 0.15x+
+- Model names are those exposed to ChatGPT-backed Codex accounts as of September 2026; if a default model is retired, the tool falls back to the closest available model automatically
 - Token estimates are conservative, not billing-accurate
 - The tool is designed around Codex local storage layout and is not a generic agent log analyzer
 - Windows support is not yet verified
@@ -174,9 +175,9 @@ If you want to override the default model split manually:
 
 ```bash
 npx codex-session-insights \
-  --facet-model gpt-5.4-mini \
-  --fast-section-model gpt-5.4-mini \
-  --insight-model gpt-5.4 \
+  --facet-model gpt-5.6-luna \
+  --fast-section-model gpt-5.6-luna \
+  --insight-model gpt-6-astra \
   --facet-effort low \
   --fast-section-effort low \
   --insight-effort high
@@ -208,3 +209,19 @@ npm run generate:test-report
 
 `npm run report:lite` runs a smaller local analysis preset for testing prompt and layout changes without paying the full 200/50 default cost.
 `npm run generate:test-report` writes a deterministic sample report page to `test-artifacts/sample-report/`.
+
+### Releasing
+
+Publishing is automated by `.github/workflows/release.yml` and uses npm Trusted Publishing, so no npm token is stored in GitHub.
+
+1. Bump `version` in `package.json` and commit.
+2. Tag the commit with the same version and push the tag:
+
+```bash
+git tag v0.3.0
+git push origin main --tags
+```
+
+The workflow runs `npm run check` and `npm test`, verifies the tag matches `package.json`, publishes to npm, installs the published package as a smoke test, and creates a GitHub Release with generated notes.
+
+One-time setup on npmjs.com: open the package settings, add a trusted publisher for GitHub Actions with repository `cosformula/codex-session-insights` and workflow `release.yml`.

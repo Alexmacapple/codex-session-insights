@@ -6,7 +6,7 @@ function makeSummary(overrides = {}) {
     title: 'Fix parser and publish package',
     firstUserMessage: 'Fix parser issue and get the package ready to publish.',
     cwd: '/repo/codex-session-insights',
-    model: 'gpt-5.4',
+    model: 'gpt-6-astra',
     modelProvider: 'openai',
     createdAt: '2026-04-01T10:00:00.000Z',
     updatedAt: '2026-04-02T10:00:00.000Z',
@@ -60,7 +60,7 @@ export function createSampleReport() {
         id: 'thread-2',
         title: 'Tighten prompts and add tests',
         cwd: '/repo/codex-session-insights',
-        model: 'gpt-5.3-codex-spark',
+        model: 'gpt-5.6-luna',
         createdAt: '2026-04-03T10:00:00.000Z',
         updatedAt: '2026-04-04T10:00:00.000Z',
         totalCommandFailures: 0,
@@ -253,8 +253,8 @@ export function createSampleReport() {
     outputTokens: 1800,
     totalTokens: 26800,
     byModel: [
-      { label: 'gpt-5.3-codex-spark', calls: 4, inputTokens: 12000, cachedInputTokens: 3000, outputTokens: 900, totalTokens: 15900 },
-      { label: 'gpt-5.4', calls: 3, inputTokens: 10000, cachedInputTokens: 0, outputTokens: 900, totalTokens: 10900 },
+      { label: 'gpt-5.6-luna', calls: 4, inputTokens: 12000, cachedInputTokens: 3000, outputTokens: 900, totalTokens: 15900 },
+      { label: 'gpt-6-astra', calls: 3, inputTokens: 10000, cachedInputTokens: 0, outputTokens: 900, totalTokens: 10900 },
     ],
     byStage: [
       { label: 'facet_extraction', calls: 2, inputTokens: 8000, cachedInputTokens: 3000, outputTokens: 500, totalTokens: 11500 },
