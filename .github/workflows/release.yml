@@ -47,13 +47,29 @@ jobs:
       - run: npm test
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          if npm view "codex-session-insights@${VERSION}" version >/dev/null 2>&1; then
+            echo "codex-session-insights@${VERSION} is already on the registry; skipping publish."
+          else
+            npm publish --access public
+          fi
 
       - name: Smoke test (npm install + version check)
         run: |
           VERSION="${{ steps.version.outputs.value }}"
-          # Wait for the registry to propagate the new version.
-          sleep 10
+          # npm processes publishes asynchronously; poll until the version resolves.
+          for attempt in $(seq 1 60); do
+            if npm view "codex-session-insights@${VERSION}" version >/dev/null 2>&1; then
+              echo "Version ${VERSION} is available after ${attempt} attempt(s)."
+              break
+            fi
+            if [ "${attempt}" = "60" ]; then
+              echo "::error::codex-session-insights@${VERSION} did not appear on the registry within 10 minutes."
+              exit 1
+            fi
+            sleep 10
+          done
           npm install -g "codex-session-insights@${VERSION}"
           ACTUAL=$(codex-session-insights --version 2>&1) || true
           echo "Installed version: ${ACTUAL}"
