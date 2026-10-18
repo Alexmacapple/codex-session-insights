@@ -13,7 +13,7 @@ This harness-maintained fork stays compatible with the upstream CLI while adding
 Install the pinned harness release from GitHub, then run it:
 
 ```bash
-npm install --global 'git+ssh://git@github.com/Alexmacapple/codex-session-insights.git#v0.5.0-harness.1'
+npm install --global 'git+ssh://git@github.com/Alexmacapple/codex-session-insights.git#v0.5.0-harness.2'
 codex-session-insights
 ```
 
@@ -149,6 +149,7 @@ Important behavior defaults:
 - Main-thread analysis is the default; sub-agent threads are excluded unless you pass `--include-subagents`
 - The CLI shows an estimate before running in interactive terminals
 - The CLI tries to open the generated HTML report in your browser after generation
+- When launched from inside a Codex session, the active report-generating thread is excluded to avoid creating a self-referential open loop
 
 ## What It Reads
 

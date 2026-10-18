@@ -5,6 +5,7 @@ import {
   inferCommandKind,
   extractCommandHead,
   extractShellScript,
+  filterExcludedThreads,
   filterSubstantiveThreads,
   summarizeThread,
 } from '../lib/codex-data.js'
@@ -160,6 +161,20 @@ test('filterSubstantiveThreads keeps only substantial threads and sorts by recen
     filtered.map(thread => thread.id),
     ['recent', 'older'],
   )
+})
+
+test('filterExcludedThreads removes the active report thread without changing other sessions', () => {
+  const threads = [{ id: 'older' }, { id: 'current' }, { id: 'newer' }]
+
+  assert.deepEqual(filterExcludedThreads(threads, ['current']).map(thread => thread.id), [
+    'older',
+    'newer',
+  ])
+  assert.deepEqual(filterExcludedThreads(threads, []).map(thread => thread.id), [
+    'older',
+    'current',
+    'newer',
+  ])
 })
 
 test('summarizeThread compacts consecutive tool bursts in transcriptForAnalysis', () => {
