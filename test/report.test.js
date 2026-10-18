@@ -24,6 +24,7 @@ function makeSummary(overrides = {}) {
     reasoningItems: 1,
     toolCounts: { apply_patch: 2, exec_command: 1 },
     commandKindCounts: { git_commit: 1 },
+    commandCounts: { 'git commit': 1 },
     toolFailures: { 'git push': 1 },
     totalToolCalls: 3,
     totalCommandFailures: 1,
@@ -32,6 +33,8 @@ function makeSummary(overrides = {}) {
     averageCommandDurationMs: 1200,
     activeMinutes: 20,
     benignCommandMisses: 3,
+    expectedCommandOutcomes: 3,
+    expectedCommandOutcomeCategories: { no_match: 3 },
     turnDurationsSeconds: [30, 90, 120],
     medianTurnSeconds: 90,
     medianUserReplyGapSeconds: 45,
@@ -123,6 +126,7 @@ test('buildReport aggregates summary metrics and terminal output', () => {
   assert.equal(report.summary.totalActiveHours, 0.7)
   assert.equal(report.summary.totalDurationHours, 1)
   assert.equal(report.summary.totalBenignMisses, 6)
+  assert.equal(report.summary.totalExpectedCommandOutcomes, 6)
   assert.equal(report.summary.turnCount, 6)
   assert.equal(report.summary.medianTurnSeconds, 90)
   assert.equal(report.summary.p90TurnSeconds, 120)
@@ -137,6 +141,105 @@ test('buildReport aggregates summary metrics and terminal output', () => {
   assert.match(terminal, /Estimate vs Actual: 1.2K tokens -> 0.9K tokens \(fresh\)/)
   assert.match(terminal, /Top Projects:/)
   assert.match(terminal, /Model Mix:/)
+})
+
+test('buildReport reconciles historical loops as resolved, still open, or unverifiable', () => {
+  const threads = [
+    makeSummary({ id: 'source-resolved', updatedAt: '2026-04-01T10:00:00.000Z' }),
+    makeSummary({ id: 'resolution', updatedAt: '2026-04-03T10:00:00.000Z' }),
+    makeSummary({ id: 'source-open', updatedAt: '2026-04-04T10:00:00.000Z' }),
+  ]
+  const facets = [
+    {
+      threadId: 'source-resolved',
+      cwd: '/repo/project-a',
+      updatedAt: '2026-04-01T10:00:00.000Z',
+      outcome: 'partially_achieved',
+      unfinished_work: 'The report was not generated.',
+    },
+    {
+      threadId: 'resolution',
+      cwd: '/repo/project-a',
+      updatedAt: '2026-04-03T10:00:00.000Z',
+      outcome: 'fully_achieved',
+      unfinished_work: 'none',
+      brief_summary: 'The report was generated and checked.',
+    },
+    {
+      threadId: 'source-open',
+      cwd: '/repo/project-a',
+      updatedAt: '2026-04-04T10:00:00.000Z',
+      outcome: 'partially_achieved',
+      unfinished_work: 'The parser coverage is still incomplete.',
+    },
+  ]
+  const report = buildReport(threads, {
+    facets,
+    insightsOverride: {
+      at_a_glance: {},
+      open_loops: {
+        intro: 'Historical unfinished work reconciled with later sessions.',
+        items: [
+          {
+            title: 'Generate report',
+            project: '/repo/project-a',
+            thread_title: 'Initial report run',
+            source_thread_id: 'source-resolved',
+            resolution_thread_id: 'resolution',
+            resolution_evidence: 'The report was generated and checked.',
+            what_is_left: 'The report was not generated in the source session.',
+            evidence: 'The source facet was partial.',
+          },
+          {
+            title: 'Complete parser coverage',
+            project: '/repo/project-a',
+            thread_title: 'Parser follow-up',
+            source_thread_id: 'source-open',
+            resolution_thread_id: '',
+            resolution_evidence: '',
+            what_is_left: 'Coverage is incomplete.',
+            evidence: 'The latest source facet remains partial.',
+          },
+          {
+            title: 'External deployment',
+            project: '/repo/elsewhere',
+            thread_title: 'Missing source',
+            source_thread_id: 'missing-thread',
+            resolution_thread_id: '',
+            resolution_evidence: '',
+            what_is_left: 'Deployment state is unknown.',
+            evidence: 'No local session can prove the state.',
+          },
+          {
+            title: 'Unsupported resolution claim',
+            project: '/repo/project-a',
+            thread_title: 'Initial report run',
+            source_thread_id: 'source-resolved',
+            resolution_thread_id: 'resolution',
+            resolution_evidence: 'A different task was completed.',
+            what_is_left: 'The report was not generated in the source session.',
+            evidence: 'The source facet was partial.',
+          },
+          {
+            title: 'Later project activity without resolution proof',
+            project: '/repo/project-a',
+            thread_title: 'Initial report run',
+            source_thread_id: 'source-resolved',
+            resolution_thread_id: '',
+            resolution_evidence: '',
+            what_is_left: 'The report was not generated in the source session.',
+            evidence: 'A later project session exists, but no exact resolution was cited.',
+          },
+        ],
+      },
+    },
+  })
+
+  assert.deepEqual(
+    report.insights.open_loops.items.map(item => item.status),
+    ['resolved', 'still_open', 'unverifiable', 'unverifiable', 'unverifiable'],
+  )
+  assert.match(report.insights.open_loops.items[0].reconciliation_evidence, /resolution/)
 })
 
 test('writeReportFiles writes JSON and HTML outputs', async () => {
@@ -236,8 +339,13 @@ test('writeReportFiles writes JSON and HTML outputs', async () => {
   assert.match(html, /1m 30s/)
   assert.match(html, /Based only on 1 of 1 labeled threads|Based on LLM labels for all 1 threads/)
   assert.match(html, /Git operation failed/)
+  assert.match(html, /Top Commands/)
+  assert.match(html, /git commit/)
+  assert.match(html, /Expected Command Outcomes/)
   assert.match(html, /Open Loops/)
   assert.match(html, /envmap acceptance/)
+  assert.match(html, /Unverifiable/)
+  assert.match(html, /Reconciliation evidence/)
   assert.doesNotMatch(html, /Avg Response/)
   assert.match(html, /Copy All Checked/)
   assert.match(html, /Paste into Codex:/)

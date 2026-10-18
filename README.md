@@ -4,14 +4,17 @@ Generate a report analyzing your Codex sessions.
 
 `codex-session-insights` reads your local Codex history, extracts recurring patterns from your sessions, and renders a narrative report as both HTML and JSON.
 
+This harness-maintained fork stays compatible with the upstream CLI while adding deterministic loop reconciliation, real-command parsing, and a separation between expected command outcomes and operational failures.
+
 ![codex-session-insights screenshot](https://raw.githubusercontent.com/cosformula/codex-session-insights/main/assets/screenshot-1.png)
 
 ## Quick Start
 
-Run it directly:
+Install the pinned harness release from GitHub, then run it:
 
 ```bash
-npx codex-session-insights
+npm install --global 'git+ssh://git@github.com/Alexmacapple/codex-session-insights.git#v0.5.0-harness.1'
+codex-session-insights
 ```
 
 The default flow is:
@@ -25,13 +28,13 @@ The default flow is:
 If you only want the estimate first:
 
 ```bash
-npx codex-session-insights --estimate-only
+codex-session-insights --estimate-only
 ```
 
 If you already know what you want and do not want the confirmation flow:
 
 ```bash
-npx codex-session-insights --yes
+codex-session-insights --yes
 ```
 
 ## What You Get
@@ -48,7 +51,7 @@ The HTML report includes these sections:
 - `How You Use Codex`
 - `Impressive Things You Did`
 - `Where Things Go Wrong`
-- `Open Loops` (sessions that ended without confirmed completion)
+- `Open Loops` (historical unfinished work reconciled as resolved, still open, or unverifiable)
 - `Features to Try`
 - `On the Horizon`
 - `One More Thing`
@@ -57,9 +60,12 @@ The HTML report includes these sections:
 
 - `Active Time` sums the gaps between consecutive rollout events, skipping any gap longer than 30 minutes. The raw first-to-last span of each thread is shown separately as `Thread span (wall clock)` in the appendix.
 - `Median Turn` is the time from a user message to the assistant's final answer for that turn. It includes tool, build, and sub-agent run time, so it describes how long turns take, not how responsive the model is.
-- `Tool Errors` counts non-zero command exits plus failed tool calls. Probe misses such as `rg`, `grep`, or `test` exiting 1 with nothing found are excluded and reported separately.
+- `Operational Errors` counts non-zero command exits plus failed tool calls after excluding expected probe misses, expected file differences, and test/lint/build checks that later pass in the same session.
+- `Expected Command Outcomes` reports those excluded outcomes by cause (`no_match`, `expected_difference`, or `recovered_check`).
+- `Top Commands` is parsed from the shell script that actually ran. `Command Kinds` uses stable semantic categories even when Codex labels a compound command `unknown`.
 - `Failure Hotspots (by command)` groups failures by the program that actually ran (`git push`, `cmake`, `npm test`), not by the Codex `parsed_cmd` type, which labels most compound commands `unknown`.
 - `Failure Causes` is a heuristic classification from exit code and output text (`test_failed`, `build_failed`, `git_error`, `command_not_found`, `interrupted`, and so on). `unclassified` means the cause could not be determined.
+- `Open Loops` never marks an item resolved from prose alone. A resolved item must cite a newer analyzed session from the same project whose outcome is complete and whose `unfinished_work` is `none`; unsupported claims become `unverifiable`.
 - `Session Types` and `Outcomes` only cover threads that received an LLM label. Each panel states its coverage (for example "12 of 124 labeled threads"), and the narrative sections are instructed not to extrapolate beyond it. Re-running the tool extends coverage because labels are cached.
 
 ## Typical Usage
@@ -67,56 +73,56 @@ The HTML report includes these sections:
 Default run:
 
 ```bash
-npx codex-session-insights
+codex-session-insights
 ```
 
 Lite local run for prompt and layout testing:
 
 ```bash
-npx codex-session-insights --preset lite
+codex-session-insights --preset lite
 ```
 
 Estimate first, then decide:
 
 ```bash
-npx codex-session-insights --days 7 --limit 20 --facet-limit 8 --estimate-only
+codex-session-insights --days 7 --limit 20 --facet-limit 8 --estimate-only
 ```
 
 Use a custom output directory:
 
 ```bash
-npx codex-session-insights --out-dir ./insights-output
+codex-session-insights --out-dir ./insights-output
 ```
 
 Emit JSON to stdout instead of a terminal summary:
 
 ```bash
-npx codex-session-insights --stdout-json
+codex-session-insights --stdout-json
 ```
 
 Include archived threads:
 
 ```bash
-npx codex-session-insights --include-archived
+codex-session-insights --include-archived
 ```
 
 Include sub-agent threads as well as main threads:
 
 ```bash
-npx codex-session-insights --include-subagents
+codex-session-insights --include-subagents
 ```
 
 Choose the report language explicitly:
 
 ```bash
-npx codex-session-insights --lang zh-CN
-npx codex-session-insights --lang en
+codex-session-insights --lang zh-CN
+codex-session-insights --lang en
 ```
 
 Use the OpenAI API instead of your local Codex CLI login:
 
 ```bash
-npx codex-session-insights --provider openai --api-key $OPENAI_API_KEY
+codex-session-insights --provider openai --api-key $OPENAI_API_KEY
 ```
 
 ## Defaults
@@ -187,7 +193,7 @@ Review `report.html` and `report.json` before sharing them.
 If you want to override the default model split manually:
 
 ```bash
-npx codex-session-insights \
+codex-session-insights \
   --facet-model gpt-5.6-luna \
   --fast-section-model gpt-5.6-luna \
   --insight-model gpt-6-astra \
@@ -199,13 +205,13 @@ npx codex-session-insights \
 To suppress browser opening:
 
 ```bash
-npx codex-session-insights --no-open
+codex-session-insights --no-open
 ```
 
 To force browser opening:
 
 ```bash
-npx codex-session-insights --open
+codex-session-insights --open
 ```
 
 ## For Contributors

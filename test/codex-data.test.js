@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   classifyCommandFailure,
+  inferCommandKind,
   extractCommandHead,
   extractShellScript,
   filterSubstantiveThreads,
@@ -361,7 +362,8 @@ test('summarizeThread understands item_completed rollouts from newer Codex relea
     'web.search': 1,
     spawn_agent: 1,
   })
-  assert.deepEqual(summary.commandKindCounts, { read: 1, unknown: 1 })
+  assert.deepEqual(summary.commandKindCounts, { read: 1, git_commit: 1 })
+  assert.deepEqual(summary.commandCounts, { sed: 1, 'git commit': 1 })
   assert.equal(summary.totalCommandFailures, 1)
   assert.equal(summary.commandFailures[0].output, 'nothing to commit, working tree clean')
   assert.equal(summary.gitCommits, 1)
@@ -398,6 +400,33 @@ test('extractCommandHead groups by the program that ran, not the shell wrapper',
     'npm test',
   )
   assert.equal(extractCommandHead("python3 - <<'PY'\nimport sys\nprint(1)\nPY"), 'python3')
+  assert.equal(
+    extractCommandHead("python3 -c 'value = 1\nfrom pathlib import Path'"),
+    'python3',
+  )
+  assert.equal(extractCommandHead("node -e 'const one = 1\nconst two = 2'"), 'node')
+})
+
+test('inferCommandKind replaces Codex unknown types with stable command categories', () => {
+  const infer = (script, parsedType = 'unknown') =>
+    inferCommandKind({ script, parsedType, head: extractCommandHead(script) })
+
+  assert.equal(infer('git commit -m "fix parser"'), 'git_commit')
+  assert.equal(infer('git push origin main'), 'git_push')
+  assert.equal(infer('rg -n parser lib'), 'search')
+  assert.equal(infer("sed -n '1,40p' lib/parser.js"), 'read')
+  assert.equal(infer('npm test'), 'test')
+  assert.equal(infer("python3 - <<'PY'\nprint('ok')\nPY"), 'script')
+  assert.equal(infer('pdftotext input.pdf output.txt'), 'document')
+  assert.equal(infer('unzip bundle.zip'), 'archive')
+  assert.equal(infer('ffmpeg -i input.mov output.mp4'), 'media')
+  assert.equal(infer('vnu index.html'), 'validation')
+  assert.equal(infer('sqlite3 state.sqlite .schema'), 'database')
+  assert.equal(infer('codex exec --json prompt'), 'agent_tool')
+  assert.equal(infer('mktemp -d'), 'system')
+  assert.equal(infer('rsync -a source/ target/'), 'sync')
+  assert.equal(infer('anything', 'list_files'), 'list_files')
+  assert.equal(infer('python3 script.py', 'python3 script.py'), 'script')
 })
 
 test('classifyCommandFailure maps exit codes and output into causes', () => {
@@ -415,6 +444,9 @@ test('classifyCommandFailure maps exit codes and output into causes', () => {
   assert.equal(classify("sed -n '1,40p' a.md && rg -n foo docs", 1, '# heading\nsome file content'), 'no_match')
   assert.equal(classify("sed -n '1,40p' a.md\nrg -n foo docs", 2, 'rg: docs: No such file or directory (os error 2)'), 'missing_file_or_module')
   assert.equal(classify('test -f missing.txt', 1, ''), 'no_match')
+  assert.equal(classify('cmp expected.txt actual.txt', 1, ''), 'expected_difference')
+  assert.equal(classify('git diff --quiet', 1, ''), 'expected_difference')
+  assert.equal(classify('find missing-root -name "*.js"', 1, ''), 'unclassified')
   assert.equal(classify('ls nope', 1, 'ls: nope: No such file or directory', 'list_files'), 'missing_file_or_module')
   assert.equal(classify('git merge origin/main', 1, 'CONFLICT (content): Merge conflict in a.c'), 'git_error')
   assert.equal(classify('npm test', 1, 'FAIL src/a.test.js\n1 failed, 3 passed'), 'test_failed')
@@ -430,7 +462,7 @@ test('classifyCommandFailure maps exit codes and output into causes', () => {
   assert.equal(classify('./run.sh', 3, ''), 'unclassified')
 })
 
-test('summarizeThread excludes probe misses from tool errors and measures turns and active time', () => {
+test('summarizeThread separates expected and recovered checks from operational errors', () => {
   const thread = {
     id: 'thread-turns',
     title: 'Turn timing',
@@ -468,6 +500,7 @@ test('summarizeThread excludes probe misses from tool errors and measures turns 
     { timestamp: '2026-04-01T10:00:00Z', type: 'event_msg', payload: { type: 'user_message', message: 'Find usages.' } },
     exec('2026-04-01T10:00:05Z', 'rg -n usages src', 1, '', 'search'),
     exec('2026-04-01T10:00:10Z', 'npm test', 1, '2 failed, 1 passed'),
+    exec('2026-04-01T10:00:15Z', 'npm run lint', 1, 'lint error'),
     assistant('2026-04-01T10:01:00Z', 'final_answer', 'Nothing found; one test fails.'),
     // The user walks away for 90 minutes: idle time, not active time.
     { timestamp: '2026-04-01T11:31:00Z', type: 'event_msg', payload: { type: 'user_message', message: 'Fix the test.' } },
@@ -480,9 +513,12 @@ test('summarizeThread excludes probe misses from tool errors and measures turns 
   assert.equal(summary.toolErrors, 1)
   assert.equal(summary.totalCommandFailures, 1)
   assert.equal(summary.benignCommandMisses, 1)
-  assert.deepEqual(summary.toolErrorCategories, { test_failed: 1 })
-  assert.deepEqual(summary.toolFailures, { 'npm test': 1 })
+  assert.equal(summary.expectedCommandOutcomes, 2)
+  assert.deepEqual(summary.expectedCommandOutcomeCategories, { no_match: 1, recovered_check: 1 })
+  assert.deepEqual(summary.toolErrorCategories, { lint_failed: 1 })
+  assert.deepEqual(summary.toolFailures, { 'npm run': 1 })
   assert.doesNotMatch(summary.transcriptForAnalysis, /Command failed: rg/)
+  assert.match(summary.transcriptForAnalysis, /Command check recovered: npm test/)
   assert.deepEqual(summary.turnDurationsSeconds, [60, 120])
   assert.equal(summary.medianTurnSeconds, 120)
   assert.equal(summary.durationMinutes, 93)

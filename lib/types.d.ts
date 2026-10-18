@@ -26,7 +26,13 @@ export interface SessionSummary {
   usesWebSearch: boolean
   usesWebFetch: boolean
   toolCounts: CountMap
+  commandKindCounts: CountMap
+  commandCounts: CountMap
   toolFailures: CountMap
+  toolErrorCategories: CountMap
+  benignCommandMisses: number
+  expectedCommandOutcomes: number
+  expectedCommandOutcomeCategories: CountMap
   firstUserMessage?: string
   transcriptForAnalysis?: string
 }
@@ -51,6 +57,7 @@ export interface SessionFacet {
   friction_detail: string
   primary_success: string
   brief_summary: string
+  unfinished_work: string
   user_instructions: string[]
 }
 
